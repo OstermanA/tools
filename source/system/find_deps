@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+[[ -z "$PREFIX" ]] && export PREFIX=~/tools/system
+
+pushd "$(dirname $0)" &>/dev/null
+MYDIR=$(pwd)
+popd &>/dev/null
+
+function lddd {
+	env -i ldd "$1" 2>/dev/null
+}
+
+echo "Enumerating imported libraries:"
+echo " Count - Library"
+while read file; do
+	[[ $(file $file) =~ ELF ]] && lddd "$file"
+done < <(find ${PREFIX} -type f -name '*so*' | sort) \
+| awk '$3 ~ "^/"{print $3}' \
+| sort \
+| uniq -c \
+| sort -k 2
+
+echo "Missing libs:"
+while read file; do
+	if [[ $(file $file) =~ ELF && ! $file =~ ${MYDIR} && $(lddd "${file}") =~ "not found" ]]; then
+    echo "$file"
+    lddd "$file"
+  fi
+done < <(find ${PREFIX} -type f | sort)

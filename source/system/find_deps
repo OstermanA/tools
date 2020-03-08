@@ -1,29 +1,44 @@
 #!/usr/bin/env bash
 
-[[ -z "$PREFIX" ]] && export PREFIX=~/tools/system
+[[ -z "${PREFIX}" ]] && export PREFIX=/sites/tools/system
+
+export TMP=/tmp/$0_$$
 
 pushd "$(dirname $0)" &>/dev/null
 MYDIR=$(pwd)
 popd &>/dev/null
 
-function lddd {
-	env -i ldd "$1" 2>/dev/null
+function find_elfs {
+	while read file; do
+		file "${file}" |& fgrep "dynamically linked" &>/dev/null && echo $file
+	done < <(find "$@" -type f) | sort
 }
 
-echo "Enumerating imported libraries:"
-echo " Count - Library"
-while read file; do
-	[[ $(file $file) =~ ELF ]] && lddd "$file"
-done < <(find ${PREFIX} -type f -name '*so*' | sort) \
-| awk '$3 ~ "^/"{print $3}' \
-| sort \
-| uniq -c \
-| sort -k 2
+function lddd {
+	env -i ldd "$@" 2>/dev/null
+}
 
-echo "Missing libs:"
-while read file; do
-	if [[ $(file $file) =~ ELF && ! $file =~ ${MYDIR} && $(lddd "${file}") =~ "not found" ]]; then
-    echo "$file"
-    lddd "$file"
-  fi
-done < <(find ${PREFIX} -type f | sort)
+echo "Findings ELFs"
+mapfile -t elfs < <(find_elfs "$PREFIX")
+
+echo "Found ${#elfs[@]} ELFs"
+
+declare -a missing
+
+echo " Count - Library"
+for elf in "${elfs[@]}"; do
+	env -i ldd "$elf" > "${TMP}" 2>/dev/null
+	if fgrep "not found" "${TMP}" &>/dev/null; then
+		missing+=("$elf")
+	fi
+	awk '{if ($2 == "=>") print $3}' "$TMP"
+done | sort | uniq -c | sort -n
+
+if [[ ${#missing[@]} -gt 0 ]]; then
+	echo "Found ${#missing[@]} ELFs missing libs:"
+	for elf in "${missing[@]}"; do
+		echo "$elf"
+		env -i ldd "$elf"
+	done
+fi
+[[ -f "$TMP" ]] && rm "$TMP"

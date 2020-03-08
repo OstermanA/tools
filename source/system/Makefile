@@ -4,13 +4,13 @@ PREFIX=$(shell dirname $(dir $(PWD)))/$(notdir $(PWD))
 endif
 SOURCE=$(PWD)
 
-LDFLAGS=-Wl,-rpath,$(PREFIX)/lib -Wl,-rpath,$(PREFIX)/lib64 -L$(PREFIX)/lib -L$(PREFIX)/lib64
-CFLAGS=-Wl,-rpath,$(PREFIX)/lib -Wl,-rpath,$(PREFIX)/lib64 -I$(PREFIX)/include
+LDFLAGS=-Wl,-rpath,$(PREFIX)/lib -Wl,-rpath,$(PREFIX)/lib64 -L$(PREFIX)/lib -L$(PREFIX)/lib64 -g -O3
+CFLAGS=-Wl,-rpath,$(PREFIX)/lib -Wl,-rpath,$(PREFIX)/lib64 -I$(PREFIX)/include -g -O3
 CPPFLAGS=$(CFLAGS)
 CXXFLAGS=$(CPPFLAGS)
-LD_LIBRARY_PATH=$(PREFIX)/lib:$(PREFIX)/lib64
+#LD_LIBRARY_PATH=$(PREFIX)/lib:$(PREFIX)/lib64
 
-export LDFLAGS CFLAGS CPPFLAGS CXXFLAGS PREFIX LD_LIBRARY_PATH
+export LDFLAGS CFLAGS CPPFLAGS CXXFLAGS PREFIX #LD_LIBRARY_PATH
 
 export http_proxy=$(PROXY)
 export https_proxy=$(PROXY)
@@ -95,11 +95,12 @@ endif
 help:
 	echo "Help stuff goes here later"
 
-all: gcc autoconf automake cmake libtool
+all: openssl libtool autoconf automake cmake gcc
 
 $(VERBOSE).SILENT:
 
 showenv:
+	echo "########################################"
 	echo "INFO: Dumping build vars:"
 	echo "INFO: PREFIX          = $(PREFIX)"
 	echo "INFO: LDFLAGS         = $(LDFLAGS)"
@@ -107,6 +108,10 @@ showenv:
 	echo "INFO: CPPFLAGS        = $(CPPFLAGS)"
 	echo "INFO: CXXFLAGS        = $(CXXFLAGS)"
 	echo "INFO: LD_LIBRARY_PATH = $(LD_LIBRARY_PATH)"
+	echo -n "INFO: Building dependencies? "
+	[[ -n $$DEPENDS ]] && echo "YES" || echo "NO"
+	echo -n "INFO: Running build checks?  "
+	[[ -n $$CHECK ]] && echo "YES" || echo "NO"
 
 autoconf: $(autoconfdepends)
 	echo "########################################"
@@ -148,7 +153,7 @@ automake: $(automakedepends)
 	
 	echo "INFO: Running $(automakedir)/configure"
 	cd "$(automakedir)" && ./configure \
-		--prefix="$(prefix)"
+		--prefix="$(PREFIX)"
 	
 	echo "INFO: Running 'make'"
 	cd "$(automakedir)" && make -j12
@@ -213,7 +218,7 @@ gcc: $(gccdepends)
 	echo "INFO: Running 'make'"
 	cd "$(gccdir)_build" && make -j12 \
 	
-	if [[ -n $$CHECK ]]; then
+	if [[ -n $$CHECK ]]; then \
 		echo "INFO: Running 'make check'"; \
 		make check; \
 	else echo "INFO: Skipping 'make check'"; fi
@@ -240,7 +245,7 @@ libtool: $(libtooldepends)
 	echo "INFO: Running 'make'"
 	cd "$(libtooldir)" && make
 	
-	if [[ -n $$CHECK ]]; then
+	if [[ -n $$CHECK ]]; then \
 		echo "INFO: Running 'make check'"; \
 		cd "$(libtooldir)" && make check; \
 	else echo "INFO: Skipping 'make check'"; fi
@@ -318,4 +323,4 @@ $(cleanlibtool):
 
 $(cleanopenssl):
 	@echo "INFO: Removing $(openssldir)"
-	rm -rf "$(libtooldir)"
+	rm -rf "$(openssldir)"
